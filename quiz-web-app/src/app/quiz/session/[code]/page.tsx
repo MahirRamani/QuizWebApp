@@ -1,8 +1,9 @@
 // app/quiz/session/[code]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 
@@ -21,7 +22,13 @@ interface Question {
   timeLimit: number;
 }
 
-export default function QuizSession({ params }: { params: { code: string } }) {
+interface PageProps {
+  params: Promise<{ code: string }>;
+}
+
+export default function QuizSession({ params }: PageProps) {
+  // Properly unwrap the params using React.use()
+  const { code } = use(params);
   const searchParams = useSearchParams();
   const participantName = searchParams.get('name') || '';
   
@@ -33,16 +40,25 @@ export default function QuizSession({ params }: { params: { code: string } }) {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [leaderboard, setLeaderboard] = useState<Participant[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
+    if (!code || !participantName) {
+      setError('Missing required information');
+      return;
+    }
+
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
 
+    // Emit join event with the unwrapped code
     newSocket.emit('join-quiz', {
-      joinCode: params.code,
+      joinCode: code,
       participantName,
     });
 
+    // Socket event listeners
     newSocket.on('participant-joined', ({ participants }) => {
       setParticipants(participants);
     });
@@ -70,10 +86,15 @@ export default function QuizSession({ params }: { params: { code: string } }) {
       setShowLeaderboard(true);
     });
 
+    newSocket.on('error', (errorMessage) => {
+      setError(errorMessage);
+    });
+
+    // Cleanup
     return () => {
       newSocket.close();
     };
-  }, [params.code, participantName]);
+  }, [code, participantName]);
 
   useEffect(() => {
     if (timeLeft > 0) {
@@ -86,27 +107,37 @@ export default function QuizSession({ params }: { params: { code: string } }) {
   }, [timeLeft]);
 
   const handleOptionSelect = (optionId: string) => {
-    if (currentQuestion?.timeLimit === 0) return;
+    if (!currentQuestion || timeLeft === 0 || !socket) return;
 
-    if (socket) {
-      const timeToAnswer = currentQuestion!.timeLimit - timeLeft;
-      socket.emit('submit-answer', {
-        questionId: currentQuestion!.id,
-        answer: [optionId],
-        timeToAnswer,
-      });
-    }
+    const timeToAnswer = currentQuestion.timeLimit - timeLeft;
+    socket.emit('submit-answer', {
+      questionId: currentQuestion.id,
+      answer: [optionId],
+      timeToAnswer,
+    });
+
+    setSelectedOptions([optionId]);
   };
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto mt-20 p-6 text-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'waiting') {
     return (
       <div className="max-w-md mx-auto mt-20 p-6 text-center">
         <h1 className="text-2xl font-bold mb-6">Waiting Room</h1>
-        <p className="mb-4">Join Code: {params.code}</p>
+        <p className="mb-4">Join Code: {code}</p>
         <div className="space-y-2">
-          <p>Participants:</p>
+          <p className="font-medium">Participants:</p>
           {participants.map((p, i) => (
-            <p key={i}>{p.name}</p>
+            <p key={i} className="py-2 px-4 bg-gray-50 rounded">{p.name}</p>
           ))}
         </div>
       </div>
@@ -116,15 +147,18 @@ export default function QuizSession({ params }: { params: { code: string } }) {
   if (showLeaderboard) {
     return (
       <div className="max-w-md mx-auto mt-20 p-6">
-        <h2 className="text-xl font-bold mb-4">Leaderboard</h2>
-        <div className="space-y-2">
+        <h2 className="text-2xl font-bold mb-6">Leaderboard</h2>
+        <div className="space-y-3">
           {leaderboard.map((p, i) => (
             <div
               key={i}
-              className="flex justify-between p-2 bg-gray-100 rounded"
+              className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
             >
-              <span>{i + 1}. {p.name}</span>
-              <span>{p.score} points</span>
+              <div className="flex items-center gap-3">
+                <span className="font-medium">{i + 1}.</span>
+                <span>{p.name}</span>
+              </div>
+              <span className="font-bold">{p.score} points</span>
             </div>
           ))}
         </div>
@@ -135,19 +169,23 @@ export default function QuizSession({ params }: { params: { code: string } }) {
   if (currentQuestion) {
     return (
       <div className="max-w-2xl mx-auto mt-20 p-6">
-        <div className="mb-4 text-right">Time left: {timeLeft}s</div>
-        <h2 className="text-xl font-bold mb-4">{currentQuestion.text}</h2>
-        <div className="space-y-2">
-        {currentQuestion.options.map((option) => (
+        <div className="mb-6 flex justify-between items-center">
+          <h2 className="text-xl font-bold">{currentQuestion.text}</h2>
+          <div className="text-lg font-medium">
+            Time left: <span className="text-blue-600">{timeLeft}s</span>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {currentQuestion.options.map((option) => (
             <Button
               key={option.id}
-              className={`w-full ${
+              className={`w-full p-4 text-left justify-start ${
                 selectedOptions.includes(option.id)
-                  ? 'bg-blue-500'
-                  : 'bg-gray-100'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-50 hover:bg-gray-100'
               }`}
               onClick={() => handleOptionSelect(option.id)}
-              disabled={timeLeft === 0}
+              disabled={timeLeft === 0 || selectedOptions.length > 0}
             >
               {option.text}
             </Button>
@@ -166,10 +204,13 @@ export default function QuizSession({ params }: { params: { code: string } }) {
           {leaderboard.map((p, i) => (
             <div
               key={i}
-              className="flex justify-between p-2 bg-gray-100 rounded"
+              className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
             >
-              <span>{i + 1}. {p.name}</span>
-              <span>{p.score} points</span>
+              <div className="flex items-center gap-3">
+                <span className="font-medium">{i + 1}.</span>
+                <span>{p.name}</span>
+              </div>
+              <span className="font-bold">{p.score} points</span>
             </div>
           ))}
         </div>

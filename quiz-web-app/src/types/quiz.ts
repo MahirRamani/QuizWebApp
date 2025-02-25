@@ -27,3 +27,18 @@ export interface Quiz {
   createdBy: string;
   isActive: boolean;
 }
+
+
+// Collaboration related types
+export interface Cursor {
+  x: number;
+  y: number;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  color: string;
+  cursor: Cursor;
+  lastActivity: number;
+}
