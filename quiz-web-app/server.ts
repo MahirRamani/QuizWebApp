@@ -3,8 +3,7 @@ import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
 import mongoose from 'mongoose';
-import { Quiz } from './src/models/Quiz';
-import { QuizSession } from './src/models/QuizSession';
+// import { QuizSession } from './src/models/QuizSession';
 import clientPromise from './src/lib/mongodb';
 
 const dev = process.env.NODE_ENV !== "production";
@@ -16,8 +15,8 @@ const handler = app.getRequestHandler();
 
 // Connect to MongoDB
 mongoose.connect('mongodb://localhost:27017/')
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 app.prepare().then(() => {
     const httpServer = createServer(handler);
@@ -26,26 +25,26 @@ app.prepare().then(() => {
             origin: "*",
         }
     });
-
+    
     io.on('connection', (socket) => {
         let currentRoom: string;
-
+        
         console.log("Socket connected");
-
+        
         socket.on('join-quiz', async ({ joinCode, participantName }: { joinCode: string; participantName: string }) => {
             try {
                 console.log("join-code", joinCode);
-
+                
                 // const quiz = await Quiz.findOne({ joinCode: joinCode });
                 // console.log("quiz", quiz);
                 // console.log("join code", joinCode);
                 const client = await clientPromise;
                 const db = client.db("quizApp");
-                const quizzes = await db.collection("quizzes").find({}).toArray();
-                console.log("quizzes", quizzes);
+                // const quizzes = await db.collection("quizzes").find({}).toArray();
+                // console.log("quizzes", quizzes);
                 const quiz = await db.collection("quizzes").findOne({ joinCode: joinCode });
-                console.log("quiz2", quiz);
-                console.log("join code2", joinCode);
+                // console.log("quiz2", quiz);
+                // console.log("join code2", joinCode);
 
                 if (!quiz) {
                     socket.emit('error', 'Quiz not found');
@@ -54,7 +53,9 @@ app.prepare().then(() => {
                 console.log("lol");
 
 
-                const session = await QuizSession.findOne({ quiz: quiz._id, status: { $ne: 'completed' } });
+                const session = await db.collection("quizzes").findOne({ _id: quiz._id, isActive: true });
+
+                console.log("id ,session ", quiz._id, session);
                 if (!session) {
                     socket.emit('error', 'Quiz session not found');
                     return;
@@ -82,6 +83,8 @@ app.prepare().then(() => {
                     participantId: participant._id,
                 });
             } catch (error) {
+                console.log(error);
+                
                 socket.emit('error', 'Failed to join quiz');
             }
         });
@@ -99,35 +102,37 @@ app.prepare().then(() => {
             answer: string[];
             timeToAnswer: number;
         }) => {
-            try {
-                const session = await QuizSession.findById(sessionId);
-                if (!session) return;
+            // try {
+            //     const client = await clientPromise;
+            //     const db = client.db("quizApp");
+            //     const session = await db.collection("quizzes").findOne({_id: sessionId.});
+            //     if (!session) return;
 
-                const quiz = await Quiz.findById(session.quiz);
-                if (!quiz) return;
+            //     const quiz = await db.collection("quizzes").findOne({ _id: session._id });
+            //     if (!quiz) return;
 
-                const question = quiz.questions[session.currentQuestion];
-                const isCorrect = validateAnswer(question, answer);
-                const points = calculatePoints(isCorrect, timeToAnswer, question.timeLimit);
+            //     const question = quiz.questions[session.currentQuestion];
+            //     const isCorrect = validateAnswer(question, answer);
+            //     const points = calculatePoints(isCorrect, timeToAnswer, question.timeLimit);
 
-                const participant = session.participants.id(participantId);
-                if (participant) {
-                    participant.answers.push({
-                        questionId,
-                        selectedOptions: answer,
-                        timeToAnswer,
-                        isCorrect,
-                        points,
-                    });
-                    participant.score += points;
-                    await session.save();
-                }
+            //     const participant = session.participants.id(participantId);
+            //     if (participant) {
+            //         participant.answers.push({
+            //             questionId,
+            //             selectedOptions: answer,
+            //             timeToAnswer,
+            //             isCorrect,
+            //             points,
+            //         });
+            //         participant.score += points;
+            //         await session.save();
+            //     }
 
-                const leaderboard = getLeaderboard(session.participants);
-                io.to(currentRoom).emit('leaderboard-update', leaderboard);
-            } catch (error) {
-                socket.emit('error', 'Failed to submit answer');
-            }
+            //     const leaderboard = getLeaderboard(session.participants);
+            //     io.to(currentRoom).emit('leaderboard-update', leaderboard);
+            // } catch (error) {
+            //     socket.emit('error', 'Failed to submit answer');
+            // }
         });
 
 

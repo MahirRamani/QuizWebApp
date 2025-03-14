@@ -12,6 +12,7 @@ export interface Question {
   text: string;
   options: Option[];
   timeLimit: number;
+  marks: number;
   order: number;
 }
 

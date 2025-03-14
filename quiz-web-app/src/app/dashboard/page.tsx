@@ -54,6 +54,17 @@ export default function Dashboard() {
     }
   };
 
+  const changeQuizStatus = async (quizId: string) => {
+    try {
+      await fetch(`/api/quizzes/status/${quizId}`, {
+        method: 'PUT',
+      });
+      fetchQuizzes();
+    } catch (error) {
+      console.error('Failed to update quiz status:', error);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
@@ -104,9 +115,10 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   variant="default"
+                  onClick={() => changeQuizStatus(quiz._id.toString())}
                   disabled={quiz.isActive}
                 >
-                  Start Quiz
+                  {quiz.isActive?"Running":"Start Quiz"}
                 </Button>
               </div>
             </div>
