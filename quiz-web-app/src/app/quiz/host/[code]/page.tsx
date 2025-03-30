@@ -12,7 +12,7 @@ interface Participant {
   _id: string;
   name: string;
   score: number;
-}
+} 
 
 interface Question {
   _id: string;
