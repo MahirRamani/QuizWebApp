@@ -13,7 +13,10 @@ export default function JoinQuiz() {
 
   const handleJoin = async () => {
     if (!joinCode || !name) return;
-    router.push(`/quiz/session/${joinCode}?name=${encodeURIComponent(name)}`);
+    // Make sure joinCode is a string
+    const codeString = String(joinCode).trim();
+    console.log("join code", codeString);
+    router.push(`/quiz/session/${codeString}`);
   };
 
   return (

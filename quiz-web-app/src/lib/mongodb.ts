@@ -38,7 +38,7 @@ export default clientPromise;
 // Helper function to connect to the database and return the database instance
 export async function connectToDatabase() {
   const client = await clientPromise;
-  const db = client.db("quizdb"); // Replace with your actual database name
+  const db = client.db("quizApp"); // Replace with your actual database name
   
   return { client, db };
 }
